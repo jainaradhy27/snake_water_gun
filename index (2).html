@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snake, Water, Gun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #10231d;
+    --panel: #17332b;
+    --panel-line: #244339;
+    --ink: #eef1e0;
+    --ink-dim: #9cb3a8;
+    --snake: #82b25f;
+    --water: #55a6bc;
+    --gun: #b7bcc2;
+    --win: #e0b94a;
+    --lose: #c1573f;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    background-image: radial-gradient(circle at 50% 0%, rgba(130,178,95,0.10), transparent 55%);
+    color: var(--ink);
+    font-family: 'Manrope', sans-serif;
+    min-height: 100vh;
+  }
+
+  .stage {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 18px;
+    padding: 30px 26px 26px;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.55);
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 27px;
+    margin: 0 0 8px;
+    letter-spacing: 0.005em;
+  }
+
+  .rule-strip {
+    font-family: 'Manrope', sans-serif;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    letter-spacing: 0.01em;
+    margin: 0 0 22px;
+    line-height: 1.6;
+  }
+  .rule-strip b { color: var(--ink); font-weight: 700; }
+
+  /* --- Triangle diagram --- */
+  .diagram-wrap { position: relative; width: 100%; max-width: 300px; margin: 0 auto 6px; }
+  .diagram-wrap svg { width: 100%; height: auto; display: block; overflow: visible; }
+
+  .node-btn { cursor: pointer; }
+  .node-btn circle.ring {
+    fill: var(--bg);
+    stroke: var(--panel-line);
+    stroke-width: 2;
+    transition: stroke 0.2s ease, filter 0.2s ease;
+  }
+  .node-btn:hover circle.ring { filter: brightness(1.15); }
+  .node-btn.picked circle.ring { stroke-width: 3; }
+  .node-btn.win-pulse circle.ring { stroke: var(--win); }
+  .node-btn.lose-dim circle.ring { opacity: 0.45; }
+
+  .node-label {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    fill: var(--ink-dim);
+    text-anchor: middle;
+  }
+
+  .edge {
+    fill: none;
+    stroke: var(--panel-line);
+    stroke-width: 2;
+    transition: stroke 0.3s ease, stroke-width 0.3s ease, opacity 0.3s ease;
+    opacity: 0.6;
+  }
+  .edge.active { stroke-width: 3.5; opacity: 1; }
+
+  /* --- Status readout --- */
+  .readout {
+    text-align: center;
+    margin: 8px 0 20px;
+    min-height: 64px;
+  }
+
+  .versus {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    color: var(--ink-dim);
+    margin: 0 0 4px;
+  }
+  .versus .you-word { color: var(--ink); font-weight: 600; }
+  .versus .comp-word { color: var(--ink); font-weight: 600; }
+
+  .result-line {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 20px;
+    min-height: 26px;
+  }
+  .result-line.win { color: var(--win); }
+  .result-line.lose { color: var(--lose); }
+  .result-line.draw { color: var(--ink-dim); }
+
+  .prompt {
+    font-family: 'Fraunces', serif;
+    font-size: 15px;
+    color: var(--ink-dim);
+    font-style: italic;
+  }
+
+  /* --- Score --- */
+  .score-row {
+    display: flex;
+    justify-content: center;
+    gap: 22px;
+    font-family: 'Manrope', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 16px;
+  }
+  .score-row .val { color: var(--ink); font-weight: 800; font-size: 14px; margin-right: 4px; }
+
+  /* --- History --- */
+  .history {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    min-height: 26px;
+  }
+  .chip {
+    font-family: 'Manrope', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    color: var(--ink-dim);
+  }
+  .chip.w { color: var(--win); border-color: var(--win); }
+  .chip.l { color: var(--lose); border-color: var(--lose); }
+
+  button.reset {
+    display: none;
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--snake);
+    color: var(--snake);
+    border-radius: 10px;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button.reset:hover { background: rgba(130,178,95,0.1); }
+  button:focus-visible { outline: 2px solid var(--win); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .edge, .node-btn circle.ring { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="card">
+    <h1>Snake, Water, Gun</h1>
+    <p class="rule-strip">
+      <b>Snake</b> drinks <b>Water</b> &middot; <b>Water</b> rusts <b>Gun</b> &middot; <b>Gun</b> kills <b>Snake</b> — tap your pick on the wheel.
+    </p>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 300 280" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink-dim)" id="arrowFill"/>
+          </marker>
+        </defs>
+
+        <!-- edges (drawn first, nodes sit on top) -->
+        <path id="edge-sw" class="edge" marker-end="url(#arrow)" d="M 150,58 Q 70,110 62,205"/>
+        <path id="edge-wg" class="edge" marker-end="url(#arrow)" d="M 68,222 Q 150,268 232,222"/>
+        <path id="edge-gs" class="edge" marker-end="url(#arrow)" d="M 238,205 Q 230,110 150,58"/>
+
+        <!-- Snake node (top) -->
+        <g class="node-btn" id="node-snake" data-choice="1" tabindex="0" role="button" aria-label="Choose snake">
+          <circle class="ring" cx="150" cy="42" r="38"/>
+          <path d="M 132,50 C 138,28 158,56 166,34" stroke="var(--snake)" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <circle cx="167" cy="33" r="2.6" fill="var(--snake)"/>
+          <text class="node-label" x="150" y="98">SNAKE</text>
+        </g>
+
+        <!-- Water node (bottom-left) -->
+        <g class="node-btn" id="node-water" data-choice="0" tabindex="0" role="button" aria-label="Choose water">
+          <circle class="ring" cx="50" cy="222" r="38"/>
+          <path d="M 50,203 C 62,218 62,232 50,236 C 38,232 38,218 50,203 Z" fill="var(--water)"/>
+          <text class="node-label" x="50" y="278">WATER</text>
+        </g>
+
+        <!-- Gun node (bottom-right) -->
+        <g class="node-btn" id="node-gun" data-choice="-1" tabindex="0" role="button" aria-label="Choose gun">
+          <circle class="ring" cx="250" cy="222" r="38"/>
+          <path d="M 231,226 h20 v-8 h10 v4 h6 v-4 h4 v10 h-4 l-2,6 h-10 l-2,-4 h-22 z" fill="var(--gun)"/>
+          <text class="node-label" x="250" y="278">GUN</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="readout">
+      <p class="versus" id="versusLine"></p>
+      <p class="result-line" id="resultLine"></p>
+      <p class="prompt" id="promptLine">Tap a choice to play</p>
+    </div>
+
+    <div class="score-row">
+      <span><span class="val" id="scoreW">0</span>wins</span>
+      <span><span class="val" id="scoreL">0</span>losses</span>
+      <span><span class="val" id="scoreD">0</span>draws</span>
+    </div>
+
+    <div class="history" id="history"></div>
+
+    <button class="reset" id="resetBtn">Reset score</button>
+  </div>
+</div>
+
+<script>
+  const NAME = { 1: "snake", 0: "water", "-1": "gun" };
+  const COLOR = { 1: "var(--snake)", 0: "var(--water)", "-1": "var(--gun)" };
+  // edge id keyed by "winner,loser"
+  const EDGE = { "1,0": "edge-sw", "0,-1": "edge-wg", "-1,1": "edge-gs" };
+
+  const nodes = {
+    1: document.getElementById('node-snake'),
+    0: document.getElementById('node-water'),
+    "-1": document.getElementById('node-gun'),
+  };
+  const versusLine = document.getElementById('versusLine');
+  const resultLine = document.getElementById('resultLine');
+  const promptLine = document.getElementById('promptLine');
+  const historyEl = document.getElementById('history');
+  const resetBtn = document.getElementById('resetBtn');
+  const scoreW = document.getElementById('scoreW');
+  const scoreL = document.getElementById('scoreL');
+  const scoreD = document.getElementById('scoreD');
+
+  let busy = false;
+  let score = { w: 0, l: 0, d: 0 };
+
+  function clearBoard() {
+    Object.values(nodes).forEach(n => n.classList.remove('picked', 'win-pulse', 'lose-dim'));
+    document.querySelectorAll('.edge').forEach(e => {
+      e.classList.remove('active');
+      e.style.stroke = 'var(--panel-line)';
+    });
+  }
+
+  function play(you) {
+    if (busy) return;
+    busy = true;
+    clearBoard();
+    nodes[you].classList.add('picked');
+    promptLine.textContent = '';
+    versusLine.textContent = `you chose ${NAME[you]}...`;
+    resultLine.textContent = '';
+    resultLine.className = 'result-line';
+
+    // brief suspense before revealing computer's pick
+    setTimeout(() => {
+      const comp = [1, 0, -1][Math.floor(Math.random() * 3)];
+      versusLine.innerHTML = `<span class="you-word">you: ${NAME[you]}</span> &nbsp;vs&nbsp; <span class="comp-word">comp: ${NAME[comp]}</span>`;
+
+      let outcome; // 'win' | 'lose' | 'draw'
+      if (comp === you) {
+        outcome = 'draw';
+        nodes[you].classList.add('win-pulse');
+        resultLine.textContent = "it's a draw";
+        resultLine.classList.add('draw');
+        score.d++;
+      } else {
+        const edgeKey = EDGE[`${you},${comp}`];
+        const youWin = !!edgeKey;
+        const winner = youWin ? you : comp;
+        const loser = youWin ? comp : you;
+        const edgeId = EDGE[`${winner},${loser}`];
+        const edgeEl = document.getElementById(edgeId);
+        edgeEl.classList.add('active');
+        edgeEl.style.stroke = COLOR[winner];
+
+        nodes[winner].classList.add('win-pulse');
+        nodes[loser].classList.add('lose-dim');
+
+        if (youWin) {
+          resultLine.textContent = 'you win!';
+          resultLine.classList.add('win');
+          score.w++;
+        } else {
+          resultLine.textContent = 'you lose';
+          resultLine.classList.add('lose');
+          score.l++;
+        }
+      }
+
+      scoreW.textContent = score.w;
+      scoreL.textContent = score.l;
+      scoreD.textContent = score.d;
+      addChip(NAME[you], outcome);
+
+      promptLine.textContent = 'Tap a choice to play again';
+      resetBtn.style.display = 'block';
+      busy = false;
+    }, 550);
+  }
+
+  function addChip(choiceName, outcome) {
+    const chip = document.createElement('span');
+    chip.className = 'chip' + (outcome === 'win' ? ' w' : outcome === 'lose' ? ' l' : '');
+    chip.textContent = choiceName[0].toUpperCase();
+    historyEl.appendChild(chip);
+  }
+
+  Object.entries(nodes).forEach(([val, el]) => {
+    el.addEventListener('click', () => play(Number(val)));
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(Number(val)); }
+    });
+  });
+
+  resetBtn.addEventListener('click', () => {
+    score = { w: 0, l: 0, d: 0 };
+    scoreW.textContent = '0';
+    scoreL.textContent = '0';
+    scoreD.textContent = '0';
+    historyEl.innerHTML = '';
+    versusLine.textContent = '';
+    resultLine.textContent = '';
+    promptLine.textContent = 'Tap a choice to play';
+    resetBtn.style.display = 'none';
+    clearBoard();
+  });
+</script>
+</body>
+</html>
